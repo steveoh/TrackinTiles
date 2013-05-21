@@ -1,8 +1,11 @@
-import gspread, os, pickle, ConfigParser, requests
+import gspread, os, pickle, ConfigParser, requests, smtplib
 from jinja2 import Template
 from datetime import datetime, timedelta
+from email.mime.text import MIMEText
 
 def get_credentials():
+    print 'getting credentials'
+    
     config = ConfigParser.RawConfigParser()
     
     secrets = 'secrets.cfg'
@@ -33,8 +36,29 @@ def get_spreadsheet(spreadsheet):
     return gc.open(spreadsheet).sheet1
 
 def milliseconds(start, stop):
+    print 'converting to milliseconds'
+    
     offset = stop - start
-    return (offset.days * 24 * 60 * 60 + offset.seconds) * 1000 + offset.microseconds / 1000.0
+    milli = (offset.days * 24 * 60 * 60 + offset.seconds) * 1000 + offset.microseconds / 1000.0
+    
+    if milli > 5000:
+        notify(milli)
+        
+    return milli
+
+def notify(time):
+    print 'notifying you'
+    to = 'sgourley@utah.gov'
+    sender = 'no-reply@utah.gov'
+    
+    msg = MIMEText('The basemaps are taking {} milliseconds to load a tile'.format(time))
+    msg['Subject'] = 'Basemaps are slowing down'
+    msg['From'] = sender
+    msg['To'] = to
+    
+    s = smtplib.SMTP('send.state.ut.us:25')
+    s.sendmail(sender, [to], msg.as_string())
+    s.quit()
 
 def request_tile():
     starttime = datetime.now()
