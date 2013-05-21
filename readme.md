@@ -1,13 +1,14 @@
-## Python Spread
+## Trackin Tiles
 
 
-Just a quick and dirty ETLish script for some data maintained in a google spreadsheet. 
+Just a quick and dirty response time tracking script for some basemaps. 
 
 Uses  
 
 * gspread data access
 * Jinja2 templating
 * pickle caching
+* requests http
 
 ## Usage
 
