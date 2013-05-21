@@ -1,9 +1,10 @@
-import gspread, os, pickle, ConfigParser, requests, smtplib
+import gspread, os, pickle, ConfigParser, requests, smtplib, time
 from jinja2 import Template
 from datetime import datetime, timedelta
 from email.mime.text import MIMEText
+from random import choice
 
-def get_credentials():
+def load_secrets():
     print 'getting credentials'
     
     config = ConfigParser.RawConfigParser()
@@ -14,8 +15,11 @@ def get_credentials():
     
     user = config.get("Google", "username")
     password = config.get("Google", "password")
+    notify = config.get("Notify", "email")
+    mail_server = config.get("Email", "server")
+    url = config.get("Track", "url")
     
-    return user, password
+    return user, password, notify, mail_server, url 
 
 def get_spreadsheet(spreadsheet):
     print 'getting data from {}'.format(spreadsheet) 
@@ -28,8 +32,7 @@ def get_spreadsheet(spreadsheet):
         pass
     
     if gc is None:    
-        creds = get_credentials() 
-        gc = gspread.login(creds[0], creds[1])
+        gc = gspread.login(secrets[0], secrets[1])
         pickle.dump(gc,open('conf.p','wb'))
     
     # Open a worksheet from spreadsheet with one shot
@@ -48,7 +51,7 @@ def milliseconds(start, stop):
 
 def notify(time):
     print 'notifying you'
-    to = 'sgourley@utah.gov'
+    to = secrets[2]
     sender = 'no-reply@utah.gov'
     
     msg = MIMEText('The basemaps are taking {} milliseconds to load a tile'.format(time))
@@ -56,18 +59,27 @@ def notify(time):
     msg['From'] = sender
     msg['To'] = to
     
-    s = smtplib.SMTP('send.state.ut.us:25')
+    s = smtplib.SMTP(secrets[3])
     s.sendmail(sender, [to], msg.as_string())
     s.quit()
 
 def request_tile():
+    basemaps = ['Vector', 'Terrain', 'Hybrid', 'Imagery', 'Topo', 'Lite', 'Hillshade']
+    map_name = choice(basemaps)
+    
+    print 'requesting tile for {}'.format(map_name)
+    
     starttime = datetime.now()
-    r = requests.get('http://mapserv.utah.gov/arcgis/rest/services/BaseMaps/Vector/MapServer/tile/4/69/68')
+    r = requests.get(secrets[4].format(map_name))
     endtime = datetime.now()
     
     return milliseconds(starttime, endtime)
 
+secrets = load_secrets()
 sheet = get_spreadsheet('CacheTileTimes')
-sheet.append_row([datetime.now(), request_tile()])
-print 'done'
+
+while True:
+    sheet.append_row([datetime.now(), request_tile()])
+    print 'sleeping 30 seconds'
+    time.sleep(30)
 
